@@ -432,21 +432,29 @@ class CallExpression(Expression):
 	def __init__(self, target: "Union[Callable, str]", args: "list[Expression]"):
 		self._target = target
 		self._addressOf = isinstance(target, str) and target.upper() == "ADDRESSOF"
+		self._valueOf = isinstance(target, str) and target.upper() == "VALUEOF"
 		self._args = args
 
 	def Resolve(self, resolver: Resolver, context):
 		for arg in self._args: arg.Resolve(resolver, context)
-		if not (isinstance(self._target, Callable) or self._addressOf):
+		if not (isinstance(self._target, Callable) or self._addressOf or self._valueOf):
 			self._target = resolver.GetFunction(self._target)
 	
 	def GetResultType(self) -> Type:
 		if self._addressOf: return self.GetAddressOfType()
+		elif self._valueOf: return self.GetValueOfType()
 		elif isinstance(self._target, Callable): return self._target.GetReturnType()
 		else: raise Exception("Function is not resolved.")
 	
 	def GetAddressOfType(self) -> Type:
 		if len(self._args) == 0: return PointerType(VoidType)
 		else: return PointerType(self._args[0].GetResultType())
+
+	def GetValueOfType(self) -> Type:
+		if len(self._args) == 0: return VoidType
+		type = self._args[0].GetResultType()
+		if isinstance(type, PointerType): return type.GetReferencedType()
+		else: return VoidType
 
 	def Emit(self, emitter: Emitter, context):
 		if self._addressOf:
@@ -455,6 +463,14 @@ class CallExpression(Expression):
 			if not isinstance(expr, VariableExpression):
 				raise Exception("Expression does not have an address.")
 			expr.GetVariable().EmitLoadAddress(emitter, context)
+		elif self._valueOf:
+			if len(self._args) != 1: raise Exception("Expected 1 operand for \"VALUEOF\" operator.")
+			expr = self._args[0]
+			type = expr.GetResultType()
+			if not isinstance(type, PointerType):
+				raise Exception("Expression does not have a referenced value.")
+			expr.Emit(emitter, context)
+			emitter.ld_ptr(type.GetSize())
 		else:
 			if not isinstance(self._target, Callable): raise Exception("Function is not resolved.")
 			if self._target.IsInline():

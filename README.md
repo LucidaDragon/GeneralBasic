@@ -29,6 +29,15 @@ Pointers are declared by adding an asterisk (*) to the end of the referenced typ
 ```
 Dim ballAddress As Ball*
 ```
+A pointer can be dereferenced by using the `ValueOf` operator.
+```
+Dim ballAddress As Ball*
+
+...
+
+Dim ball As Ball
+ball = ValueOf(ballAddress)
+```
 A pointer to a variable can be obtained using the `AddressOf` operator.
 ```
 Dim ball As Ball
